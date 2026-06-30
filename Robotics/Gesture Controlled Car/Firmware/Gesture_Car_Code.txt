@@ -1,0 +1,109 @@
+#include <esp_now.h>
+#include <WiFi.h>
+
+// --- PIN DEFINITIONS ---
+#define L_F 26
+#define L_B 27
+#define R_F 14
+#define R_B 12
+#define ENA 25
+#define ENB 13
+#define BUZZER 33
+
+int carSpeed = 220;
+unsigned long lastSignalTime = 0;
+
+// Data structure
+typedef struct {
+  char cmd;
+} Message;
+
+Message incomingData;
+
+// --- MANUAL TONE FOR PASSIVE BUZZER ---
+void toneManual(int pin, int freq, int duration) {
+  int delayTime = 1000000 / freq / 2;
+  int cycles = freq * duration / 1000;
+
+  for (int i = 0; i < cycles; i++) {
+    digitalWrite(pin, HIGH);
+    delayMicroseconds(delayTime);
+    digitalWrite(pin, LOW);
+    delayMicroseconds(delayTime);
+  }
+}
+
+// --- STARTUP SOUND ---
+void playStartupTone() {
+  pinMode(BUZZER, OUTPUT);
+
+  toneManual(BUZZER, 1000, 120);
+  delay(50);
+  toneManual(BUZZER, 1400, 120);
+  delay(50);
+  toneManual(BUZZER, 1800, 120);
+  delay(50);
+  toneManual(BUZZER, 2200, 200);
+}
+
+// --- MOTOR CONTROL ---
+void stopCar() {
+  digitalWrite(L_F, LOW); digitalWrite(L_B, LOW);
+  digitalWrite(R_F, LOW); digitalWrite(R_B, LOW);
+  analogWrite(ENA, 0);
+  analogWrite(ENB, 0);
+}
+
+void moveCar(int lf, int lb, int rf, int rb) {
+  digitalWrite(L_F, lf); digitalWrite(L_B, lb);
+  digitalWrite(R_F, rf); digitalWrite(R_B, rb);
+
+  analogWrite(ENA, carSpeed);
+  analogWrite(ENB, carSpeed);
+}
+
+// --- RECEIVE CALLBACK ---
+void onReceive(const esp_now_recv_info *info, const uint8_t *data, int len) {
+  memcpy(&incomingData, data, sizeof(incomingData));
+  lastSignalTime = millis();
+
+  char d = incomingData.cmd;
+
+  if(d == 'W')      moveCar(HIGH, LOW, HIGH, LOW);
+  else if(d == 'S') moveCar(LOW, HIGH, LOW, HIGH);
+  else if(d == 'A') moveCar(LOW, HIGH, HIGH, LOW);
+  else if(d == 'D') moveCar(HIGH, LOW, LOW, HIGH);
+  else              stopCar();
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  pinMode(L_F, OUTPUT); pinMode(L_B, OUTPUT);
+  pinMode(R_F, OUTPUT); pinMode(R_B, OUTPUT);
+  pinMode(ENA, OUTPUT); pinMode(ENB, OUTPUT);
+  pinMode(BUZZER, OUTPUT);
+
+  stopCar();
+
+  // Startup sound
+  playStartupTone();
+
+  // ESP-NOW setup
+  WiFi.mode(WIFI_STA);
+
+  if (esp_now_init() != ESP_OK) {
+    Serial.println("ESP-NOW Init Failed");
+    return;
+  }
+
+  esp_now_register_recv_cb(onReceive);
+
+  Serial.println("Car Ready");
+}
+
+void loop() {
+  if (millis() - lastSignalTime > 1000) {
+    stopCar();
+  }
+}

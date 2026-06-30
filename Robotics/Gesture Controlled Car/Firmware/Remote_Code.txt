@@ -1,0 +1,64 @@
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+#include <Wire.h>
+#include <MPU6050.h>
+
+MPU6050 mpu;
+
+// Replace with your ESP32 MAC
+uint8_t receiverMAC[] = {0x38, 0x18, 0x2B, 0xB2, 0x98, 0xA0};
+
+typedef struct {
+  char cmd;
+} Message;
+
+Message data;
+
+String lastCmd = "";
+
+void setup() {
+  Serial.begin(115200);
+
+  Wire.begin(D2, D1);
+  mpu.initialize();
+
+  if (!mpu.testConnection()) {
+    Serial.println("MPU6050 Error");
+    while (1);
+  }
+
+  WiFi.mode(WIFI_STA);
+
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW Error");
+    return;
+  }
+
+  esp_now_set_self_role(ESP_NOW_ROLE_CONTROLLER);
+  esp_now_add_peer(receiverMAC, ESP_NOW_ROLE_SLAVE, 1, NULL, 0);
+
+  Serial.println("Remote Ready");
+}
+
+void loop() {
+  int16_t ax, ay, az;
+  mpu.getAcceleration(&ax, &ay, &az);
+
+  char cmd = 'X';
+
+  if (abs(ax) < 3000 && abs(ay) < 3000) cmd = 'X';
+  else if (ay < -8000) cmd = 'W';
+  else if (ay > 8000) cmd = 'S';
+  else if (ax > 8000) cmd = 'D';
+  else if (ax < -8000) cmd = 'A';
+
+  if (String(cmd) != lastCmd) {
+    data.cmd = cmd;
+    esp_now_send(receiverMAC, (uint8_t *) &data, sizeof(data));
+    lastCmd = String(cmd);
+
+    Serial.println(cmd);
+  }
+
+  delay(100);
+}
