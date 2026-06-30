@@ -4,6 +4,15 @@
 
 ---
 
+## Engineering Project Demonstrations
+
+Project demonstrations and hardware showcases are available on my YouTube Engineering Portfolio.
+
+**YouTube Channel:**  
+https://www.youtube.com/@AnusheelSingh12
+
+---
+
 # Overview
 
 The **Embedded Systems Learning Lab** serves as the foundation of my embedded systems engineering journey.
