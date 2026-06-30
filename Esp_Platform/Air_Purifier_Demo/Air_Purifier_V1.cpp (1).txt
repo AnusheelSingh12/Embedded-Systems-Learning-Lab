@@ -1,0 +1,87 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+
+// PIN ASSIGNMENTS
+#define SDA_PIN 32
+#define SCL_PIN 33
+#define MQ2_PIN 34
+#define ENA 25
+#define IN1 26 
+#define IN2 27 
+#define ENB 13
+#define IN3 14 
+#define IN4 12
+
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+int threshold = 2500; 
+
+void setup() {
+  // Initialize Fan Pins
+  pinMode(ENA, OUTPUT); pinMode(IN1, OUTPUT); pinMode(IN2, OUTPUT);
+  pinMode(ENB, OUTPUT); pinMode(IN3, OUTPUT); pinMode(IN4, OUTPUT);
+
+  // Ensure everything is OFF at start
+  digitalWrite(ENA, LOW); digitalWrite(IN1, LOW); digitalWrite(IN2, LOW);
+  digitalWrite(ENB, LOW); digitalWrite(IN3, LOW); digitalWrite(IN4, LOW);
+  
+  // Start LCD with Custom Pins
+  Wire.begin(SDA_PIN, SCL_PIN); 
+  lcd.init();
+  lcd.backlight();
+
+  // STARTUP ANIMATION
+  lcd.setCursor(0, 0);
+  lcd.print("AIR PURIFIER v1");
+  for (int i = 0; i < 16; i++) {
+    lcd.setCursor(i, 1);
+    lcd.print("="); 
+    delay(100);
+  }
+  
+  // SENSOR WARM-UP (Fans stay OFF)
+  lcd.clear();
+  lcd.setCursor(0, 0);
+  lcd.print("HEATER WARMING");
+  for (int i = 20; i > 0; i--) {
+    lcd.setCursor(0, 1);
+    lcd.print("READY IN: ");
+    lcd.print(i);
+    lcd.print("s  ");
+    delay(1000);
+  }
+  lcd.clear();
+}
+
+void loop() {
+  int gasValue = analogRead(MQ2_PIN);
+
+  // ROW 0: Continuous Quality Value
+  lcd.setCursor(0, 0);
+  lcd.print("QUALITY: ");
+  lcd.print(gasValue);
+  lcd.print("    "); 
+
+  // ROW 1: System Status & Fan Control
+  lcd.setCursor(0, 1);
+  if (gasValue > threshold) {
+    // HAZARD DETECTED - ACTIVATE FANS
+    lcd.print("STATUS: HAZARD! ");
+    
+    digitalWrite(IN2, LOW);
+    digitalWrite(IN4, LOW);
+    digitalWrite(IN1, HIGH);
+    digitalWrite(IN3, HIGH);
+    digitalWrite(ENA, HIGH);
+    digitalWrite(ENB, HIGH);
+  } else {
+    // AIR IS GOOD - DEACTIVATE FANS
+    lcd.print("STATUS: GOOD    ");
+    
+    digitalWrite(ENA, LOW);
+    digitalWrite(ENB, LOW);
+    digitalWrite(IN1, LOW);
+    digitalWrite(IN3, LOW);
+  }
+  
+  delay(500); 
+}
