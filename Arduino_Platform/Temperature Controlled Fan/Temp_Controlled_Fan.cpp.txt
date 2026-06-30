@@ -1,0 +1,87 @@
+#include <Wire.h>
+#include <LiquidCrystal_I2C.h>
+#include <DHT.h>
+
+// LCD setup
+LiquidCrystal_I2C lcd(0x27, 16, 2);
+
+// DHT setup
+#define DHTPIN 2
+#define DHTTYPE DHT11
+DHT dht(DHTPIN, DHTTYPE);
+
+// Motor pins (Channel B)
+int IN3 = 9;
+int IN4 = 10;
+int ENB = 11;
+
+// Temperature thresholds
+float minTemp = 25.0;  // fan starts
+float maxTemp = 40.0;  // full speed
+
+void setup() {
+  lcd.init();
+  lcd.backlight();
+
+  dht.begin();
+
+  pinMode(IN3, OUTPUT);
+  pinMode(IN4, OUTPUT);
+  pinMode(ENB, OUTPUT);
+
+  lcd.setCursor(0, 0);
+  lcd.print("Temp Fan Ready");
+  delay(2000);
+  lcd.clear();
+}
+
+void loop() {
+  float temp = dht.readTemperature();
+
+  if (isnan(temp)) {
+    lcd.setCursor(0, 0);
+    lcd.print("Sensor Error!");
+    return;
+  }
+
+  // Display temperature
+  lcd.setCursor(0, 0);
+  lcd.print("Temp: ");
+  lcd.print(temp);
+  lcd.print((char)223);
+  lcd.print("C ");
+
+  int speed = 0;
+
+  // Temperature → Speed logic
+  if (temp < minTemp) {
+    speed = 0;  // OFF
+  } 
+  else if (temp <= maxTemp) {
+    speed = map(temp, minTemp, maxTemp, 120, 255);
+  } 
+  else {
+    speed = 255; // Full speed
+  }
+
+  // Motor control
+  if (speed > 0) {
+    digitalWrite(IN3, HIGH);
+    digitalWrite(IN4, LOW);
+  } else {
+    digitalWrite(IN3, LOW);
+    digitalWrite(IN4, LOW);
+  }
+
+  analogWrite(ENB, speed);
+
+  // Display speed %
+  int percent = map(speed, 0, 255, 0, 100);
+
+  lcd.setCursor(0, 1);
+  lcd.print("Fan: ");
+  lcd.print(percent);
+  lcd.print("%   ");
+
+  delay(2000);
+}
